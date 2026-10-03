@@ -56,7 +56,7 @@ with sd.RawInputStream(16000, channels=1, dtype="int16", blocksize=1280) as stre
                     
                     audio = torch.cat(recording).numpy()
 
-                    segments = model.transcribe(audio)
+                    segments = transcriber.transcribe(audio)
                     text = "".join(segment.text for segment in segments)
                     print(text)
                     word.reset()
