@@ -1,25 +1,11 @@
-from pyopen_wakeword.const import Model
-
-
-from silero_vad.sequence_vad import SileroVADSequence
-
-
-from silero_vad.utils_vad import OnnxWrapper
-
-
-from typing import Any
-
-import stopwatch
-
-
-import time
-
 import numpy as np
+import pywhispercpp.model
 import silero_vad
 import sounddevice as sd
+import stopwatch
 import torch
-from pyopen_wakeword import OpenWakeWord, OpenWakeWordFeatures, Model
-import pywhispercpp.model
+from pyopen_wakeword import Model, OpenWakeWord, OpenWakeWordFeatures
+from silero_vad.utils_vad import OnnxWrapper
 
 word = OpenWakeWord.from_builtin(Model.HEY_JARVIS)
 features = OpenWakeWordFeatures.from_builtin()
@@ -32,17 +18,19 @@ with sd.RawInputStream(16000, channels=1, dtype="int16", blocksize=1280) as stre
         data, overflowed = stream.read(1280)
         for embedding in features.process_streaming(bytes(data)):
             for probability in word.process_streaming(embedding):
-
                 if probability > 0.5:
                     print("Hey Jarvis")
-                    with sd.RawInputStream(samplerate=16000, blocksize=512, channels=1, dtype="int16") as talk:
+                    with sd.RawInputStream(
+                        samplerate=16000, blocksize=512, channels=1, dtype="int16"
+                    ) as talk:
                         watch = stopwatch.Stopwatch()
                         watch.start()
                         recording = []
                         while True:
                             data, overflowed = talk.read(512)
                             audio = torch.from_numpy(
-                                np.frombuffer(data, dtype=np.int16).astype(np.float32) / 32768.0
+                                np.frombuffer(data, dtype=np.int16).astype(np.float32)
+                                / 32768.0
                             )
                             recording.append(audio)
                             speech_probability = model(audio, 16000).item()
@@ -50,10 +38,10 @@ with sd.RawInputStream(16000, channels=1, dtype="int16", blocksize=1280) as stre
                                 print("speech")
                                 watch.reset()
                                 watch.start()
-                            
+
                             elif watch.elapsed > 1.3:
                                 break
-                    
+
                     audio = torch.cat(recording).numpy()
 
                     segments = transcriber.transcribe(audio)
@@ -61,7 +49,3 @@ with sd.RawInputStream(16000, channels=1, dtype="int16", blocksize=1280) as stre
                     print(text)
                     word.reset()
                     features.reset()
-
-                    
-                
-
