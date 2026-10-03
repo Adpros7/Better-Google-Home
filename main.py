@@ -1,3 +1,6 @@
+from pyopen_wakeword.const import Model
+
+
 from silero_vad.sequence_vad import SileroVADSequence
 
 
@@ -16,13 +19,12 @@ import silero_vad
 import sounddevice as sd
 import torch
 from pyopen_wakeword import OpenWakeWord, OpenWakeWordFeatures, Model
-from faster_whisper import WhisperModel
+import pywhispercpp.model
 
 word = OpenWakeWord.from_builtin(Model.HEY_JARVIS)
 features = OpenWakeWordFeatures.from_builtin()
 
-whisper = Model("base.en")
-
+transcriber = pywhispercpp.model.Model("base.en")
 model: OnnxWrapper = silero_vad.load_silero_vad(onnx=True)  # pyright: ignore[reportAssignmentType]
 
 with sd.RawInputStream(16000, channels=1, dtype="int16", blocksize=1280) as stream:
@@ -47,9 +49,19 @@ with sd.RawInputStream(16000, channels=1, dtype="int16", blocksize=1280) as stre
                             if speech_probability > 0.5:
                                 print("speech")
                                 watch.reset()
+                                watch.start()
                             
                             elif watch.elapsed > 1.3:
                                 break
+                    
+                    audio = torch.cat(recording).numpy()
+
+                    segments = model.transcribe(audio)
+                    text = "".join(segment.text for segment in segments)
+                    print(text)
+                    word.reset()
+                    features.reset()
+
                     
                 
 
