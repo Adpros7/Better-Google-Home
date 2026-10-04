@@ -8,6 +8,7 @@ dependencies = [
     "faster-whisper>=1.2.1",
     "laya[onnx]>=0.3.24",
     "mlx-whisper>=0.4.3",
+    "num2words>=0.5.14",
     "pocket-tts>=3.3.0",
     "pyaudio>=0.2.14",
     "pytest>=9.1.1",

@@ -13,8 +13,6 @@ from silero_vad.utils_vad import OnnxWrapper
 from laya import Router
 from questions import questions
 from temperature import get_temperature
-import scipy.io.wavfile
-
 
 word = OpenWakeWord.from_builtin(Model.HEY_JARVIS)
 features = OpenWakeWordFeatures.from_builtin()
@@ -64,8 +62,14 @@ with sd.RawInputStream(16000, channels=1, dtype="int16", blocksize=1280) as stre
                         latitude, longitude = eval(os.environ["MY_LOCATION"])
                         temp, feels_like_temp = get_temperature(latitude, longitude)
                         tts_model = TTSModel.load_model()
-                        voice_state = tts_model.get_state_for_audio_prompt("my_voice.safetensors")
-                        audio = tts_model.generate_audio(voice_state, f"The temperature is {temp} and the feels tike temperature is {feels_like_temp}")
-                        scipy.io.wavfile.write("output.wav", tts_model.sample_rate, audio.numpy())
+                        voice_state = tts_model.get_state_for_audio_prompt("my_voice.safetensors")  # ty:ignore[invalid-argument-type]
+                        print("playing")
+                        audio = tts_model.generate_audio_stream(voice_state, f"The temperature is {temp} Fahrenheit and the feels tike temperature is {feels_like_temp} Fahrenheit")  # ty:ignore[too-many-positional-arguments]
+                        ostream = sd.OutputStream(24000, channels=1, dtype="float32")
+                        ostream.start()
+                        for chunk in audio:
+                            ostream.write(chunk)
+                        
+                        ostream.close()
                         word.reset()
                         features.reset()

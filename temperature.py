@@ -1,4 +1,6 @@
 import requests
+from num2words import num2words
+
 
 def get_temperature(latitude, longitude):
     data = requests.get(
@@ -11,4 +13,6 @@ def get_temperature(latitude, longitude):
         },
     ).json()["current"]
 
-    return round(data["temperature_2m"]), round(data["apparent_temperature"])
+    return num2words(round(data["temperature_2m"])), num2words(
+        round(data["apparent_temperature"])
+    )
