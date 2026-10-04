@@ -1,6 +1,6 @@
-
-
+import atexit
 import os
+import subprocess
 from pocket_tts import TTSModel
 import numpy as np
 import pywhispercpp.model
@@ -13,6 +13,18 @@ from silero_vad.utils_vad import OnnxWrapper
 from laya import Router
 from questions import questions
 from temperature import get_temperature
+
+proc = subprocess.Popen(['llama-server', '-m', '~/Models/Qwen3-0.6B-Q4_0.gguf', '--host', '127.0.0.1', '--port', '8080', '-c', '4096'])
+
+def clean():
+    proc.terminate()
+    try:
+        proc.wait(8)
+    
+    except subprocess.TimeoutExpired:
+        proc.kill()
+
+atexit.register(clean)
 
 word = OpenWakeWord.from_builtin(Model.HEY_JARVIS)
 features = OpenWakeWordFeatures.from_builtin()
@@ -62,9 +74,9 @@ with sd.RawInputStream(16000, channels=1, dtype="int16", blocksize=1280) as stre
                         latitude, longitude = eval(os.environ["MY_LOCATION"])
                         temp, feels_like_temp = get_temperature(latitude, longitude)
                         tts_model = TTSModel.load_model()
-                        voice_state = tts_model.get_state_for_audio_prompt("my_voice.safetensors")  # ty:ignore[invalid-argument-type]
+                        voice_state = tts_model.get_state_for_audio_prompt("hf://kyutai/tts-voices/alba-mackenna/casual.wav")  # ty:ignore[invalid-argument-type]
                         print("playing")
-                        audio = tts_model.generate_audio_stream(voice_state, f"The temperature is {temp} Fahrenheit and the feels tike temperature is {feels_like_temp} Fahrenheit")  # ty:ignore[too-many-positional-arguments]
+                        audio = tts_model.generate_audio_stream(voice_state, f"The temperature is {temp} degrees Fahrenheit and the feels tike temperature is {feels_like_temp} degrees Fahrenheit")  # ty:ignore[too-many-positional-arguments]
                         ostream = sd.OutputStream(24000, channels=1, dtype="float32")
                         ostream.start()
                         for chunk in audio:
