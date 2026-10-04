@@ -13,8 +13,9 @@ from silero_vad.utils_vad import OnnxWrapper
 from laya import Router
 from questions import questions
 from temperature import get_temperature
+import agents
 
-proc = subprocess.Popen(['llama-server', '-m', '~/Models/Qwen3-0.6B-Q4_0.gguf', '--host', '127.0.0.1', '--port', '8080', '-c', '4096'])
+proc = subprocess.Popen(['llama-server', '-m', '~/Models/Qwen3-0.6B-Q4_0.gguf', '--host', '127.0.0.1', '--port', '9931', '-c', '4096'])
 
 def clean():
     proc.terminate()
@@ -25,6 +26,11 @@ def clean():
         proc.kill()
 
 atexit.register(clean)
+
+agents.set_default_openai_api("chat_completions")
+os.environ["OPENAI_BASE_URL"] = "127.0.0.1:9931/v1"
+
+agent = agents.Agent("worker", instructions="You are a samrt home assistant who is running through voice. Use the available tools when needed to provide an accurate response. Respond in no more than 3 sentences.")
 
 word = OpenWakeWord.from_builtin(Model.HEY_JARVIS)
 features = OpenWakeWordFeatures.from_builtin()
