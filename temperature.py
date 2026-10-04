@@ -11,4 +11,4 @@ def get_temperature(latitude, longitude):
         },
     ).json()["current"]
 
-    return data["temperature_2m"], data["apparent_temperature"]
+    return round(data["temperature_2m"]), round(data["apparent_temperature"])

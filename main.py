@@ -1,3 +1,7 @@
+
+
+import os
+
 import numpy as np
 import pywhispercpp.model
 import silero_vad
@@ -56,6 +60,7 @@ with sd.RawInputStream(16000, channels=1, dtype="int16", blocksize=1280) as stre
                     choice = route["answers"]["department"]["choice"]
                     print(choice)
                     if choice == "temperature":
-                        get_temperature()
+                        latitude, longitude = eval(os.environ["MY_LOCATION"])
+                        print(get_temperature(latitude, longitude))
                     word.reset()
                     features.reset()
