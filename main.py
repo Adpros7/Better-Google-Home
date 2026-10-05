@@ -1,6 +1,7 @@
 import atexit
 import os
 import subprocess
+from agents.mcp import MCPServer, MCPServerStdio, MCPServerStreamableHttp
 from pocket_tts import TTSModel
 import numpy as np
 import pywhispercpp.model
@@ -28,6 +29,7 @@ proc = subprocess.Popen([
 ])
 
 
+
 def clean():
     proc.terminate()
     try:
@@ -45,6 +47,7 @@ os.environ["OPENAI_BASE_URL"] = "127.0.0.1:9931/v1"
 agent = agents.Agent(
     "worker",
     instructions="You are a samrt home assistant who is running through voice. Use the available tools when needed to provide an accurate response. Respond in no more than 3 sentences.",
+    model="gpt-5.6-luna"
 )
 
 word = OpenWakeWord.from_builtin(Model.HEY_JARVIS)
@@ -55,8 +58,8 @@ router = Router()
 model: OnnxWrapper = silero_vad.load_silero_vad(onnx=True)  # pyright: ignore[reportAssignmentType]
 tts_model = TTSModel.load_model()
 voice_state = tts_model.get_state_for_audio_prompt(
-    "hf://kyutai/tts-voices/alba-mackenna/casual.wav"
-)  # ty:ignore[invalid-argument-type]
+    "hf://kyutai/tts-voices/alba-mackenna/casual.wav"  # ty:ignore[invalid-argument-type]
+)  
 
 with sd.RawInputStream(16000, channels=1, dtype="int16", blocksize=1280) as stream:
     while True:
@@ -98,8 +101,12 @@ with sd.RawInputStream(16000, channels=1, dtype="int16", blocksize=1280) as stre
                     if choice == "temperature":
                         latitude, longitude = eval(os.environ["MY_LOCATION"])
                         temp, feels_like_temp = get_temperature(latitude, longitude)
+                        with subprocess.Popen(['TRANSPORT=http', 'PORT=4383', 'open-meteo-mcp-server']) as proc:
+                            agent.mcp_servers = [MCPServerStreamableHttp({"url": "http://127.0.0.1:4383"})]
                         answer = f"The temperature is {temp} degrees Fahrenheit and the feels tike temperature is {feels_like_temp} degrees Fahrenheit"
 
+                    else: 
+                        answer = "Sorry, this is unsupported"
                     print("playing")
                     audio = tts_model.generate_audio_stream(voice_state, answer)  # ty:ignore[too-many-positional-arguments]
                     ostream = sd.OutputStream(24000, channels=1, dtype="float32")

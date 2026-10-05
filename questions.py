@@ -3,7 +3,6 @@ questions = {
         'type': 'choice',
         'instructions': 'What should happen here?',
         'criteria': {
-            'handoff to llm': 'multistep instructions, things not listed otherwise',
             'light on': 'When the user asks for a light to be turned on',
             'light off': 'When the user asks for a light to be turned off',
             'sports score': 'when user asks for information of ONE game',
@@ -15,6 +14,7 @@ questions = {
             'temperature': 'use when user asks about temperature',
             'weather': 'use when user asks about weather',
             'humidity': 'use when user asks about humidity',
+            'handoff to llm': 'multistep instructions, things not listed otherwise',
         },
     },
 }
