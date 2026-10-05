@@ -14,7 +14,7 @@ questions = {
             'temperature': 'use when user asks about temperature',
             'weather': 'use when user asks about weather',
             'humidity': 'use when user asks about humidity',
-            'handoff to llm': 'multistep instructions, things not listed otherwise',
+            'handoff to llm': 'multistep instructions, things not listed otherwise. Also use when not sure what to do.',
         },
     },
 }
