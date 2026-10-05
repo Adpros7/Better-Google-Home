@@ -1,6 +1,9 @@
 import atexit
 import os
+from pathlib import Path
+import statistics
 import subprocess
+from typing import Any
 from agents.mcp import MCPServer, MCPServerStdio, MCPServerStreamableHttp
 from pocket_tts import TTSModel
 import numpy as np
@@ -19,7 +22,7 @@ import agents
 proc = subprocess.Popen([
     "llama-server",
     "-m",
-    "~/Models/Qwen3-0.6B-Q4_0.gguf",
+    f"{Path().home()}/Models/Qwen3-0.6B-Q4_0.gguf",
     "--host",
     "127.0.0.1",
     "--port",
@@ -97,7 +100,19 @@ with sd.RawInputStream(16000, channels=1, dtype="int16", blocksize=1280) as stre
                     print(text)
                     route = router.predict(text, questions)
                     choice = route["answers"]["department"]["choice"]
-                    print(choice)
+                    print(choice, route)
+                    if route["answer_confidence"] < 0.65:
+                        choice = "handoff to llm"
+                    
+                    elif 0.65 < route["answer_confidence"] < 0.8:
+                        confidence: list[float] = [route["answer_confidence"]]
+                        confidence.extend([router.predict(text, questions)["answer_confidence"] for i in range(6)])
+                        if statistics.fmean(confidence) < 0.7 or not len(set[float](confidence)) == 1:
+                            choice = "handoff to llm"
+                        
+                            
+
+
                     if choice == "temperature":
                         latitude, longitude = eval(os.environ["MY_LOCATION"])
                         temp, feels_like_temp = get_temperature(latitude, longitude)
