@@ -1,14 +1,12 @@
-import asyncio
 import atexit
 import os
 from pathlib import Path
 import statistics
 import subprocess
 from time import sleep
-from typing import Any
-from agents.mcp import MCPServer, MCPServerStdio, MCPServerStreamableHttp
+from agents.mcp import MCPServerStdio, create_static_tool_filter
 from openai import OpenAI
-from openai.types.responses import ResponseTextDeltaEvent
+from openai.types import Reasoning
 from pocket_tts import TTSModel
 import numpy as np
 import pywhispercpp.model
@@ -20,20 +18,25 @@ from pyopen_wakeword import Model, OpenWakeWord, OpenWakeWordFeatures
 from silero_vad.utils_vad import OnnxWrapper
 from laya import Router
 from questions import questions
-from temperature import get_temperature
 import agents
+from synchronicity import Synchronizer
+import geocoder
 
 
 llama = subprocess.Popen([
     "llama-server",
     "-m",
     f"{Path().home()}/Models/Qwen3-0.6B-Q4_0.gguf",
+    "--alias",
+    "model",
     "--host",
     "127.0.0.1",
     "--port",
     "9931",
     "-c",
-    "4096",
+    "128000",
+    "--chat-template-kwargs",
+    '{"enable_thinking":false}',
 ])
 
 
@@ -54,12 +57,28 @@ os.environ["OPENAI_BASE_URL"] = "http://127.0.0.1:9931/v1"
 agent = agents.Agent(
     "worker",
     instructions="You are a smart home assistant who is running through voice. Use the available tools when needed to provide an accurate response. Respond in no more than 3 sentences.",
-    model=f"{Path().home()}/Models/Qwen3-0.6B-Q4_0.gguf",
+    model="model",
+    model_settings=agents.ModelSettings(tool_choice="required"),
 )
 
 sleep(2)
 print(OpenAI(base_url="http://127.0.0.1:9931/v1").models.list())
-print(f"{Path().home()}/Models/Qwen3-0.6B-Q4_0.gguf")
+
+syncer = Synchronizer()
+
+
+@syncer.create_blocking
+async def run_agent(text, server):
+    async with server:
+        agent.mcp_servers = [server]
+        response = agents.Runner.run_streamed(
+            starting_agent=agent,
+            input=text,
+        )
+
+        async for event in response.stream_events():
+            yield event
+
 
 word = OpenWakeWord.from_builtin(Model.HEY_JARVIS)
 features = OpenWakeWordFeatures.from_builtin()
@@ -131,14 +150,25 @@ with sd.RawInputStream(16000, channels=1, dtype="int16", blocksize=1280) as stre
                             choice = "handoff to llm"
 
                     if choice == "temperature":
-                        server = MCPServerStdio({
-                            "command": "open-meteo-mcp-server",
-                            "env": {**os.environ, "PORT": "4383"},
-                        })
-                        agent.mcp_servers
+                        server = MCPServerStdio(
+                            {
+                                "command": "open-meteo-mcp-server",
+                            },
+                            tool_filter=create_static_tool_filter([
+                                "weather_forecast",
+                                "weather_archive",
+                                "geocoding",
+                            ]),
+                        )
+
+                        addon = f"COORDINATES: {geocoder.ip('me').latlng}. its longitude, latitude. Give me Fahrenheit. In your response, don't use coordinates, geocode them to a town. and say, town, state. dont get more specific."
+
                     else:
                         answer = "Sorry, this is unsupported"
+                        addon = ""
                     print("playing")
+                    for chunk in run_agent(text + f"  {addon}", server):  # pyright: ignore[reportPossiblyUnboundVariable, reportCallIssue, reportGeneralTypeIssues]
+                        print(chunk, end="", flush=True)
                     audio = tts_model.generate_audio_stream(voice_state, answer)  # ty:ignore[too-many-positional-arguments]
                     ostream = sd.OutputStream(24000, channels=1, dtype="float32")
                     ostream.start()

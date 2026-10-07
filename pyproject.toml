@@ -7,6 +7,7 @@ requires-python = "==3.13.9"
 dependencies = [
     "aiter>=0.13.20191203",
     "faster-whisper>=1.2.1",
+    "geocoder>=1.38.1",
     "laya[onnx]>=0.3.24",
     "mlx-whisper>=0.4.3",
     "num2words>=0.5.14",
