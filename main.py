@@ -1,10 +1,14 @@
+import asyncio
 import atexit
 import os
 from pathlib import Path
 import statistics
 import subprocess
+from time import sleep
 from typing import Any
 from agents.mcp import MCPServer, MCPServerStdio, MCPServerStreamableHttp
+from openai import OpenAI
+from openai.types.responses import ResponseTextDeltaEvent
 from pocket_tts import TTSModel
 import numpy as np
 import pywhispercpp.model
@@ -19,7 +23,8 @@ from questions import questions
 from temperature import get_temperature
 import agents
 
-proc = subprocess.Popen([
+
+llama = subprocess.Popen([
     "llama-server",
     "-m",
     f"{Path().home()}/Models/Qwen3-0.6B-Q4_0.gguf",
@@ -33,24 +38,28 @@ proc = subprocess.Popen([
 
 
 def clean():
-    proc.terminate()
+    llama.terminate()
     try:
-        proc.wait(8)
+        llama.wait(0.5)
 
     except subprocess.TimeoutExpired:
-        proc.kill()
+        llama.kill()
 
 
 atexit.register(clean)
 
 agents.set_default_openai_api("chat_completions")
-os.environ["OPENAI_BASE_URL"] = "127.0.0.1:9931/v1"
+os.environ["OPENAI_BASE_URL"] = "http://127.0.0.1:9931/v1"
 
 agent = agents.Agent(
     "worker",
-    instructions="You are a samrt home assistant who is running through voice. Use the available tools when needed to provide an accurate response. Respond in no more than 3 sentences.",
-    model="gpt-5.6-luna",
+    instructions="You are a smart home assistant who is running through voice. Use the available tools when needed to provide an accurate response. Respond in no more than 3 sentences.",
+    model=f"{Path().home()}/Models/Qwen3-0.6B-Q4_0.gguf",
 )
+
+sleep(2)
+print(OpenAI(base_url="http://127.0.0.1:9931/v1").models.list())
+print(f"{Path().home()}/Models/Qwen3-0.6B-Q4_0.gguf")
 
 word = OpenWakeWord.from_builtin(Model.HEY_JARVIS)
 features = OpenWakeWordFeatures.from_builtin()
@@ -100,13 +109,19 @@ with sd.RawInputStream(16000, channels=1, dtype="int16", blocksize=1280) as stre
                     route = router.predict(text, questions)
                     choice = route["answers"]["department"]["choice"]
                     print(choice, route)
-                    if route["answer_confidence"] < 0.65:
+                    if route["answers"]["department"]["answer_confidence"] < 0.65:
                         choice = "handoff to llm"
 
-                    elif 0.65 < route["answer_confidence"] < 0.8:
-                        confidence: list[float] = [route["answer_confidence"]]
+                    elif (
+                        0.65 < route["answers"]["department"]["answer_confidence"] < 0.8
+                    ):
+                        confidence: list[float] = [
+                            route["answers"]["department"]["answer_confidence"]
+                        ]
                         confidence.extend([
-                            router.predict(text, questions)["answer_confidence"]
+                            router.predict(text, questions)["answers"]["department"][
+                                "answer_confidence"
+                            ]
                             for i in range(6)
                         ])
                         if (
@@ -116,20 +131,11 @@ with sd.RawInputStream(16000, channels=1, dtype="int16", blocksize=1280) as stre
                             choice = "handoff to llm"
 
                     if choice == "temperature":
-                        latitude, longitude = eval(os.environ["MY_LOCATION"])
-                        temp, feels_like_temp = get_temperature(latitude, longitude)
-                        with subprocess.Popen([
-                            "TRANSPORT=http",
-                            "PORT=4383",
-                            "open-meteo-mcp-server",
-                        ]) as proc:
-                            agent.mcp_servers = [
-                                MCPServerStreamableHttp({
-                                    "url": "http://127.0.0.1:4383"
-                                })
-                            ]
-                        answer = f"The temperature is {temp} degrees Fahrenheit and the feels tike temperature is {feels_like_temp} degrees Fahrenheit"
-
+                        server = MCPServerStdio({
+                            "command": "open-meteo-mcp-server",
+                            "env": {**os.environ, "PORT": "4383"},
+                        })
+                        agent.mcp_servers
                     else:
                         answer = "Sorry, this is unsupported"
                     print("playing")
