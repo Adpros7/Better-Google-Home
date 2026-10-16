@@ -1,12 +1,11 @@
 import atexit
 import os
-from pathlib import Path
 import statistics
 import subprocess
 from time import sleep
-from agents.mcp import MCPServerStdio, create_static_tool_filter
+from xsmeteo.models.forecast import ForecastResponse
+from geocoder import ip
 from openai import OpenAI
-from openai.types import Reasoning
 from pocket_tts import TTSModel
 import numpy as np
 import pywhispercpp.model
@@ -20,13 +19,15 @@ from laya import Router
 from questions import questions
 import agents
 from synchronicity import Synchronizer
-import geocoder
-
+from geopy.geocoders import Nominatim
+from xsmeteo import XSMeteo
 
 llama = subprocess.Popen([
     "llama-server",
-    "-m",
-    f"{Path().home()}/Models/Qwen3-0.6B-Q4_0.gguf",
+    "--hf-repo",
+    "mradermacher/hua-1.7b-GGUF",
+    "--hf-file",
+    "hua-1.7b.Q4_K_M.gguf",
     "--alias",
     "model",
     "--host",
@@ -34,9 +35,12 @@ llama = subprocess.Popen([
     "--port",
     "9931",
     "-c",
-    "128000",
+    "8192",
+    "--reasoning",
+    "off",
+    "--jinja",
     "--chat-template-kwargs",
-    '{"enable_thinking":false}',
+    '{"enable_thinking":false}',e
 ])
 
 
@@ -56,28 +60,37 @@ os.environ["OPENAI_BASE_URL"] = "http://127.0.0.1:9931/v1"
 
 agent = agents.Agent(
     "worker",
-    instructions="You are a smart home assistant who is running through voice. Use the available tools when needed to provide an accurate response. Respond in no more than 3 sentences.",
+    instructions="You are a smart home assistant who is running through voice. Use the available tools when needed to provide an accurate response. Respond in no more than 3 sentences. NO EMOJIS. ALWAYS WRITE OUT THE SYMBOLS AND NUMBERS AS WORDS. so for example if you want to write $50, write fifty dollars",
     model="model",
-    model_settings=agents.ModelSettings(tool_choice="required"),
+    model_settings=agents.ModelSettings(max_tokens=512),
 )
 
-sleep(2)
-print(OpenAI(base_url="http://127.0.0.1:9931/v1").models.list())
+
+while True:
+    try:
+        OpenAI(base_url="http://127.0.0.1:9931/v1").models.list()
+        break
+    
+    except:
+        sleep(0.5)
 
 syncer = Synchronizer()
 
 
 @syncer.create_blocking
-async def run_agent(text, server):
-    async with server:
-        agent.mcp_servers = [server]
-        response = agents.Runner.run_streamed(
-            starting_agent=agent,
-            input=text,
-        )
+async def run_agent(text, server=None):
+    if server:
+        async with server:
+            agent.mcp_servers = [server]
+            response = agents.Runner.run_streamed(
+                starting_agent=agent,
+                input=text,
+            )
+    else:
+        response = agents.Runner.run_streamed(starting_agent=agent, input=text)
 
-        async for event in response.stream_events():
-            yield event
+    async for event in response.stream_events():
+        yield event
 
 
 word = OpenWakeWord.from_builtin(Model.HEY_JARVIS)
@@ -149,26 +162,35 @@ with sd.RawInputStream(16000, channels=1, dtype="int16", blocksize=1280) as stre
                         ):
                             choice = "handoff to llm"
 
+                    answer = ""
                     if choice == "temperature":
-                        server = MCPServerStdio(
-                            {
-                                "command": "open-meteo-mcp-server",
-                            },
-                            tool_filter=create_static_tool_filter([
-                                "weather_forecast",
-                                "weather_archive",
-                                "geocoding",
-                            ]),
-                        )
-
-                        addon = f"COORDINATES: {geocoder.ip('me').latlng}. its longitude, latitude. Give me Fahrenheit. In your response, don't use coordinates, geocode them to a town. and say, town, state. dont get more specific."
+                        with XSMeteo() as client:
+                            current: ForecastResponse = client.get_forecast(
+                                latitude=ip("me").lat,
+                                longitude=ip("me").lng,
+                                current=["temperature_2m", "apparent_temperature"],
+                                temperature_unit="fahrenheit",
+                            )
+                            print(current.current)
+                        addon = f"SYSTEM PROMPT: Take this information and take what you need to ANSWER the question comprehensively yet concisely LOCATION: {Nominatim(user_agent='betterghome').reverse(ip('me').latlng)}, \
+                            CURRENT TEMPERATURE: {current.current['temperature_2m']}, \
+                            FEELS LIKE TEMPERATURE: {current.current['apparent_temperature']}\
+                            FORMATTING RULES: NO NEWLINES OR ANYTHING. ONLY GIVE THE USER WHAT THEY ASKED FOR. NO EMOJIS. ALWAYS WRITE OUT THE SYMBOLS AND NUMBERS AS WORDS. for example 45.4°F becomes forty-five point four degrees fahrenheit. also, if referencing a location, you only need the town and place. so Grove street, watertown, MA, USA ebcomes watertown, Massachusetts\
+                            Also, remember to only give what the user asked for, if they asked for temperatature, give them ONLY temperature, not also feels like temperature. An for god sakes, don't be too specfc with the location. Also, try to sound natural. For example, say things like It's twenty-four degrees fahrenheit in Watertown, Massachusetts. DON'T say its 24°F"
 
                     else:
                         answer = "Sorry, this is unsupported"
                         addon = ""
                     print("playing")
-                    for chunk in run_agent(text + f"  {addon}", server):  # pyright: ignore[reportPossiblyUnboundVariable, reportCallIssue, reportGeneralTypeIssues]
+                    for chunk in run_agent(text + f"  {addon}"):  # pyright: ignore[reportPossiblyUnboundVariable, reportCallIssue, reportGeneralTypeIssues]
                         print(chunk, end="", flush=True)
+                        if (
+                            chunk.type == "run_item_stream_event"
+                            and chunk.name == "message_output_created"
+                        ):
+                            answer += agents.ItemHelpers.text_message_output(chunk.item)
+
+                    print(answer)
                     audio = tts_model.generate_audio_stream(voice_state, answer)  # ty:ignore[too-many-positional-arguments]
                     ostream = sd.OutputStream(24000, channels=1, dtype="float32")
                     ostream.start()
