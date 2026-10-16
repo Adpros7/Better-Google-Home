@@ -85,6 +85,7 @@ dependencies = [
     { name = "num2words" },
     { name = "openai-agents" },
     { name = "openmeteo-sdk" },
+    { name = "playsound3" },
     { name = "pocket-tts" },
     { name = "pyaudio" },
     { name = "pytest" },
@@ -108,6 +109,7 @@ requires-dist = [
     { name = "num2words", specifier = ">=0.5.14" },
     { name = "openai-agents", specifier = ">=0.23.1" },
     { name = "openmeteo-sdk", specifier = ">=1.28.0" },
+    { name = "playsound3", specifier = ">=3.3.2" },
     { name = "pocket-tts", specifier = ">=3.3.0" },
     { name = "pyaudio", specifier = ">=0.2.14" },
     { name = "pytest", specifier = ">=9.1.1" },
@@ -1279,6 +1281,18 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/17/c8/721b3855fe457da514fe249247d404b9b39c5d16532278f70ebaa6acf18b/platformdirs-4.12.2.tar.gz", hash = "sha256:eab5f70271a490ef74618bb314fbb86e3c7e82fa3b9c922c2ea0e0a1a155d329", size = 59353, upload-time = "2026-09-29T18:27:56.009Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d0/89/446044f33aba0348d35e433f56d12206d010a5281a1df54054d4cfb82388/platformdirs-4.12.2-py3-none-any.whl", hash = "sha256:29dbf06d96c500bc6bdbce75fb0a14d63279c93b1842f97e72a135b33e856983", size = 32457, upload-time = "2026-09-29T18:27:54.43Z" },
+]
+
+[[package]]
+name = "playsound3"
+version = "3.3.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pywin32", marker = "sys_platform == 'win32'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/f8/da/cad7906fffd15c13db1ee02054e0d59d86711e366947f05bc9a2e9da0e8a/playsound3-3.3.2.tar.gz", hash = "sha256:a19d9f542beb3ce5ecb4ca780b47092c785725263e339bed8e7d340b322c4f9d", size = 608816, upload-time = "2026-07-18T11:31:59.941Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8b/39/93f689120673873a1328fbf94b6906a16b5ada41f33af0699f2eddc73cff/playsound3-3.3.2-py3-none-any.whl", hash = "sha256:fde2ca4378ae7a34d125a5965799fb1eee2af9907dbec29d394e29d28ee4137b", size = 9824, upload-time = "2026-07-18T11:31:58.207Z" },
 ]
 
 [[package]]
