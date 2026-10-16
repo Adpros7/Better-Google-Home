@@ -5,7 +5,7 @@ import subprocess
 from time import sleep
 from xsmeteo.models.forecast import ForecastResponse
 from geocoder import ip
-from openai import InternalServerError, OpenAI
+from openai import APIConnectionError, InternalServerError, OpenAI
 from pocket_tts import TTSModel
 import numpy as np
 import pywhispercpp.model
@@ -72,7 +72,7 @@ while True:
         OpenAI(base_url="http://127.0.0.1:9931/v1").models.list()
         break
     
-    except InternalServerError:
+    except (InternalServerError, APIConnectionError):
         sleep(0.5)
 
 syncer = Synchronizer()
@@ -167,40 +167,26 @@ with sd.RawInputStream(16000, channels=1, dtype="int16", blocksize=1280) as stre
 
                     answer = ""
                     if choice == "temperature":
-
-                        lat, long = eval(os.environ["MY_LOCATION"]) # in the form "(lat, long)""
-                        with XSMeteo() as client:
-                            current: ForecastResponse = client.get_forecast(
-                                latitude=lat,
-                                longitude=long,
-                                current=["temperature_2m", "apparent_temperature"],
-                                temperature_unit="fahrenheit",
-                            )
-                            print(current.current)
-                        addon = f"SYSTEM PROMPT: Take this information and take what you need to ANSWER the question comprehensively yet concisely LOCATION: {Nominatim(user_agent='betterghome').reverse(ip('me').latlng)}, \
-                            CURRENT TEMPERATURE: {round(float(current.current['temperature_2m']))}, \
-                            FEELS LIKE TEMPERATURE: {round(float(current.current['apparent_temperature']))}\
-                            FORMATTING RULES: NO NEWLINES OR ANYTHING. ONLY GIVE THE USER WHAT THEY ASKED FOR. NO EMOJIS. ALWAYS WRITE OUT THE SYMBOLS AND NUMBERS AS WORDS. for example 45.4°F becomes forty-five point four degrees fahrenheit. also, if referencing a location, you only need the town and place. so Grove street, watertown, MA, USA ebcomes watertown, Massachusetts\
-                            Also, remember to only give what the user asked for, if they asked for temperatature, give them ONLY temperature, not also feels like temperature. An for god sakes, don't be too specfc with the location. Also, try to sound natural. For example, say things like It's twenty-four degrees fahrenheit in Watertown, Massachusetts. DON'T say its 24°F"
-
+                        from temperature import addon
                     else:
                         answer = "Sorry, this is unsupported"
                         addon = ""
                     print("playing")
+                    ostream = sd.OutputStream(24000, channels=1, dtype="float32")
+                    ostream.start()
                     for chunk in run_agent(text + f"  {addon}"):  # pyright: ignore[reportPossiblyUnboundVariable, reportCallIssue, reportGeneralTypeIssues]
                         print(chunk, end="", flush=True)
                         if (
                             chunk.type == "run_item_stream_event"
                             and chunk.name == "message_output_created"
                         ):
-                            answer += agents.ItemHelpers.text_message_output(chunk.item)
-
+                            add = agents.ItemHelpers.text_message_output(chunk.item)
+                            answer += add
+                            audio = tts_model.generate_audio_stream(voice_state, answer)  # ty:ignore[too-many-positional-arguments]
+                            for chunk in audio:
+                                ostream.write(chunk)
+                    
                     print(answer)
-                    audio = tts_model.generate_audio_stream(voice_state, answer)  # ty:ignore[too-many-positional-arguments]
-                    ostream = sd.OutputStream(24000, channels=1, dtype="float32")
-                    ostream.start()
-                    for chunk in audio:
-                        ostream.write(chunk)
 
                     ostream.close()
                     word.reset()
