@@ -1,4 +1,5 @@
 import atexit
+from ipaddress import ip_address
 import os
 from pathlib import Path
 import statistics
@@ -20,12 +21,12 @@ from questions import questions
 import agents
 from synchronicity import Synchronizer
 from playsound3 import playsound
+from fabric import Connection
 
 MAIN_MACHINE = "darwin"
 if not sys.platform == MAIN_MACHINE:
     code = Path(__file__).read_text()
-    subprocess.run(f"ssh {os.environ["MAIN_MACHINE_HOST_ADDRESS"]} && ", shell=True, 
-    timeout=3)
+    with Connection(os.environ["HOST_ADDRESS"], os)
     
 
 llama = subprocess.Popen([

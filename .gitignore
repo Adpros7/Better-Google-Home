@@ -12,3 +12,5 @@ wheels/
 wyoming-openwakeword/
 *.wav
 *.safetensors
+
+.env.local
