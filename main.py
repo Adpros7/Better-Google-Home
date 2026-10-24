@@ -1,10 +1,10 @@
 import atexit
 import os
+from pathlib import Path
 import statistics
 import subprocess
+import sys
 from time import sleep
-from xsmeteo.models.forecast import ForecastResponse
-from geocoder import ip
 from openai import APIConnectionError, InternalServerError, OpenAI
 from pocket_tts import TTSModel
 import numpy as np
@@ -19,12 +19,18 @@ from laya import Router
 from questions import questions
 import agents
 from synchronicity import Synchronizer
-from geopy.geocoders import Nominatim
-from xsmeteo import XSMeteo
 from playsound3 import playsound
+
+MAIN_MACHINE = "darwin"
+if not sys.platform == MAIN_MACHINE:
+    code = Path(__file__).read_text()
+    subprocess.run(f"ssh {os.environ["MAIN_MACHINE_HOST_ADDRESS"]} && ", shell=True, 
+    timeout=3)
+    
 
 llama = subprocess.Popen([
     "llama-server",
+    
     "--hf-repo",
     "mradermacher/hua-1.7b-GGUF",
     "--hf-file",
@@ -71,7 +77,7 @@ while True:
     try:
         OpenAI(base_url="http://127.0.0.1:9931/v1").models.list()
         break
-    
+
     except (InternalServerError, APIConnectionError):
         sleep(0.5)
 
@@ -185,7 +191,7 @@ with sd.RawInputStream(16000, channels=1, dtype="int16", blocksize=1280) as stre
                             audio = tts_model.generate_audio_stream(voice_state, answer)  # ty:ignore[too-many-positional-arguments]
                             for chunk in audio:
                                 ostream.write(chunk)
-                    
+
                     print(answer)
 
                     ostream.close()
