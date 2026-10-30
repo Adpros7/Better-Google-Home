@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = "==3.13.9"
 dependencies = [
     "aiter>=0.13.20191203",
+    "dotenv>=0.9.9",
     "fabric>=3.2.3",
     "faster-whisper>=1.2.1",
     "geocoder>=1.38.1",

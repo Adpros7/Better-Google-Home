@@ -1,5 +1,6 @@
 import atexit
 from ipaddress import ip_address
+from json import load
 import os
 from pathlib import Path
 import statistics
@@ -22,12 +23,13 @@ import agents
 from synchronicity import Synchronizer
 from playsound3 import playsound
 from fabric import Connection
+from dotenv import load_dotenv
+
+load_dotenv(".env.local")
 
 MAIN_MACHINE = "darwin"
 if not sys.platform == MAIN_MACHINE:
-    code = Path(__file__).read_text()
-    with Connection(os.environ["HOST_ADDRESS"], os)
-    
+    Connection(os.environ["HOST_ADDRESS"], os.environ["HOST_USER"], connect_kwargs={"password": os.environ["PASSWORD"]})
 
 llama = subprocess.Popen([
     "llama-server",
