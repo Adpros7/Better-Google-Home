@@ -27,12 +27,7 @@ from dotenv import load_dotenv
 
 load_dotenv(".env.local")
 
-MAIN_MACHINE = "darwin"
-if not sys.platform == MAIN_MACHINE:
-    Connection(os.environ["HOST_ADDRESS"], os.environ["HOST_USER"], connect_kwargs={"password": os.environ["PASSWORD"]})
-
-llama = subprocess.Popen([
-    "llama-server",
+startLlamaServerCmd = ["llama-server",
     
     "--hf-repo",
     "mradermacher/hua-1.7b-GGUF",
@@ -41,7 +36,7 @@ llama = subprocess.Popen([
     "--alias",
     "model",
     "--host",
-    "127.0.0.1",
+    "0.0.0.0",
     "--port",
     "9931",
     "-c",
@@ -50,11 +45,24 @@ llama = subprocess.Popen([
     "off",
     "--jinja",
     "--chat-template-kwargs",
-    '{"enable_thinking":false}',
-])
+    '{"enable_thinking":false}',]
+    
+MAIN_MACHINE = "darwin"
+ssh = False
+if not sys.platform == MAIN_MACHINE:
+    ssh = True
+    connection = Connection(os.environ["HOST_ADDRESS"], os.environ["HOST_USER"], connect_kwargs={"password": os.environ["PASSWORD"]})
+    sshPID = connection.run(startLlamaServerCmd, asynchronous=True).pid
+
+if not ssh:
+    llama = subprocess.Popen(startLlamaServerCmd) if no
 
 
 def clean():
+    if ssh:
+        connection.run(f"kill -9 {sshPID}")
+        return
+        
     llama.terminate()
     try:
         llama.wait(0.5)
